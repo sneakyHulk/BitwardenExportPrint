@@ -1,0 +1,12 @@
+import "PasswordElement.idl";
+
+namespace BitwardenExportPrint
+{
+    [default_interface]
+    runtimeclass MainPage : Windows.UI.Xaml.Controls.Page
+    {
+        MainPage();
+
+        Windows.Foundation.Collections.IObservableVector<PasswordElement> password_elements{ get; };
+    }
+}
