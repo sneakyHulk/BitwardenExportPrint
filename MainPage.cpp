@@ -13,7 +13,7 @@ namespace winrt::BitwardenExportPrint::implementation {
 	MainPage::MainPage() {
 		InitializeComponent();
 	}
-	void MainPage::OnNavigatedTo(Windows::UI::Xaml::Navigation::NavigationEventArgs const& e) {
+	void MainPage::OnNavigatedTo([[maybe_unused]] Windows::UI::Xaml::Navigation::NavigationEventArgs const& args) {
 		_print_manager = Windows::Graphics::Printing::PrintManager::GetForCurrentView();
 		_print_manager.PrintTaskRequested(Windows::Foundation::TypedEventHandler<Windows::Graphics::Printing::PrintManager, Windows::Graphics::Printing::PrintTaskRequestedEventArgs>(this, &MainPage::PrintTaskRequested));
 
@@ -28,7 +28,7 @@ namespace winrt::BitwardenExportPrint::implementation {
 	}
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::Print_Click(winrt::Windows::Foundation::IInspectable const& sender, winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
+void winrt::BitwardenExportPrint::implementation::MainPage::Print_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& args) {
 	if (Windows::Graphics::Printing::PrintManager::IsSupported()) {
 		try {
 			_print_manager.ShowPrintUIAsync();
@@ -52,7 +52,7 @@ void winrt::BitwardenExportPrint::implementation::MainPage::Print_Click(winrt::W
 	}
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskRequested(Windows::Graphics::Printing::PrintManager const& sender, Windows::Graphics::Printing::PrintTaskRequestedEventArgs args) {
+void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskRequested([[maybe_unused]] Windows::Graphics::Printing::PrintManager const& sender, Windows::Graphics::Printing::PrintTaskRequestedEventArgs args) {
 	Windows::Graphics::Printing::PrintTask print_task = args.Request().CreatePrintTask(L"Print", Windows::Graphics::Printing::PrintTaskSourceRequestedHandler([=](Windows::Graphics::Printing::PrintTaskSourceRequestedArgs args) {
 		args.SetSource(_print_document_source);
 	}));
@@ -60,7 +60,7 @@ void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskRequested(W
 	print_task.Completed(Windows::Foundation::TypedEventHandler<Windows::Graphics::Printing::PrintTask, Windows::Graphics::Printing::PrintTaskCompletedEventArgs>(this, &MainPage::PrintTaskCompleted));
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskCompleted(Windows::Graphics::Printing::PrintTask const& sender, Windows::Graphics::Printing::PrintTaskCompletedEventArgs args) {
+void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskCompleted([[maybe_unused]] Windows::Graphics::Printing::PrintTask const& sender, Windows::Graphics::Printing::PrintTaskCompletedEventArgs args) {
 	if (args.Completion() == Windows::Graphics::Printing::PrintTaskCompletion::Failed) {
 		Windows::UI::Xaml::Controls::ContentDialog no_printing;
 		no_printing.Title(winrt::box_value(L"Printing error"));
@@ -71,7 +71,7 @@ void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskCompleted(W
 	}
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::Paginate(winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::PaginateEventArgs args) {
+void winrt::BitwardenExportPrint::implementation::MainPage::Paginate([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::PaginateEventArgs args) {
 	Windows::Graphics::Printing::PrintTaskOptions printing_options(args.PrintTaskOptions());
 	Windows::Graphics::Printing::PrintPageDescription page_description = printing_options.GetPageDescription(0);
 
@@ -89,11 +89,11 @@ void winrt::BitwardenExportPrint::implementation::MainPage::Paginate(winrt::Wind
 	_print_document.SetPreviewPageCount(1, Windows::UI::Xaml::Printing::PreviewPageCountType::Final);
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::GetPreviewPage(winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::GetPreviewPageEventArgs args) {
+void winrt::BitwardenExportPrint::implementation::MainPage::GetPreviewPage([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::GetPreviewPageEventArgs args) {
 	_print_document.SetPreviewPage(args.PageNumber(), _print_page);
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::AddPages(winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::AddPagesEventArgs args) {
+void winrt::BitwardenExportPrint::implementation::MainPage::AddPages([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::AddPagesEventArgs args) {
 	_print_document.AddPage(_print_page);
 
 	_print_document.AddPagesComplete();
@@ -127,6 +127,6 @@ winrt::fire_and_forget winrt::BitwardenExportPrint::implementation::MainPage::pi
 	}
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::Do_Stuff_Click(winrt::Windows::Foundation::IInspectable const& sender, winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
+void winrt::BitwardenExportPrint::implementation::MainPage::Do_Stuff_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
 	pick_file();
 }

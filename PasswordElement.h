@@ -5,7 +5,7 @@ namespace winrt::BitwardenExportPrint::implementation {
 	struct PasswordElement : PasswordElementT<PasswordElement> {
 		PasswordElement() = default;
 
-		PasswordElement(hstring const& description, hstring const& username, hstring const& password);
+		PasswordElement(hstring const&, hstring const&, hstring const&);
 		hstring description();
 		hstring username();
 		hstring password();

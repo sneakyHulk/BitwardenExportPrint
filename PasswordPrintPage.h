@@ -8,7 +8,7 @@ namespace winrt::BitwardenExportPrint::implementation {
 	struct PasswordPrintPage : PasswordPrintPageT<PasswordPrintPage> {
 		PasswordPrintPage() = default;
 
-		PasswordPrintPage(winrt::BitwardenExportPrint::MainPage const& main_page);
+		PasswordPrintPage(winrt::BitwardenExportPrint::MainPage const&);
 
 		winrt::Windows::Foundation::Collections::IObservableVector<winrt::BitwardenExportPrint::PasswordElement> PasswordPrintPage::password_elements();
 

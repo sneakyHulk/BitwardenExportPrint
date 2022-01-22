@@ -11,7 +11,7 @@ namespace winrt::BitwardenExportPrint::implementation {
 	struct MainPage : MainPageT<MainPage> {
 		MainPage();
 
-		void OnNavigatedTo(Windows::UI::Xaml::Navigation::NavigationEventArgs const& e);
+		void OnNavigatedTo(Windows::UI::Xaml::Navigation::NavigationEventArgs const&);
 
 		winrt::Windows::Foundation::Collections::IObservableVector<winrt::BitwardenExportPrint::PasswordElement> password_elements();
 
@@ -27,17 +27,17 @@ namespace winrt::BitwardenExportPrint::implementation {
 
 		Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement> _password_elements = winrt::single_threaded_observable_vector<BitwardenExportPrint::PasswordElement>();
 
-		void PrintTaskRequested(Windows::Graphics::Printing::PrintManager const& sender, Windows::Graphics::Printing::PrintTaskRequestedEventArgs args);
-		void PrintTaskCompleted(Windows::Graphics::Printing::PrintTask const& sender, Windows::Graphics::Printing::PrintTaskCompletedEventArgs args);
-		void Paginate(winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::PaginateEventArgs args);
-		void GetPreviewPage(winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::GetPreviewPageEventArgs args);
-		void AddPages(winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::AddPagesEventArgs args);
+		void PrintTaskRequested(Windows::Graphics::Printing::PrintManager const&, Windows::Graphics::Printing::PrintTaskRequestedEventArgs);
+		void PrintTaskCompleted(Windows::Graphics::Printing::PrintTask const&, Windows::Graphics::Printing::PrintTaskCompletedEventArgs);
+		void Paginate(winrt::Windows::Foundation::IInspectable const&, Windows::UI::Xaml::Printing::PaginateEventArgs);
+		void GetPreviewPage(winrt::Windows::Foundation::IInspectable const&, Windows::UI::Xaml::Printing::GetPreviewPageEventArgs);
+		void AddPages(winrt::Windows::Foundation::IInspectable const&, Windows::UI::Xaml::Printing::AddPagesEventArgs);
 
 		winrt::fire_and_forget pick_file();
 
 	public:
-		void Print_Click(winrt::Windows::Foundation::IInspectable const& sender, winrt::Windows::UI::Xaml::RoutedEventArgs const& e);
-		void Do_Stuff_Click(winrt::Windows::Foundation::IInspectable const& sender, winrt::Windows::UI::Xaml::RoutedEventArgs const& e);
+		void Print_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
+		void Do_Stuff_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 	};
 }
 
