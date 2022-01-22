@@ -2,4 +2,4 @@
     C++/WinRT BitwardenExportPrint Project Overview
 ========================================================================
 
-Prints a bitwarden json export
+Prints a bitwarden json exports
