@@ -5,6 +5,7 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <winrt/Windows.Storage.Pickers.h>
+#include <windows.ui.xaml.interop.h>
 
 using namespace winrt;
 using namespace Windows::UI::Xaml;
@@ -13,23 +14,257 @@ namespace winrt::BitwardenExportPrint::implementation {
 	MainPage::MainPage() {
 		InitializeComponent();
 	}
-	void MainPage::OnNavigatedTo([[maybe_unused]] Windows::UI::Xaml::Navigation::NavigationEventArgs const& args) {
-		_print_manager = Windows::Graphics::Printing::PrintManager::GetForCurrentView();
-		_print_manager.PrintTaskRequested(Windows::Foundation::TypedEventHandler<Windows::Graphics::Printing::PrintManager, Windows::Graphics::Printing::PrintTaskRequestedEventArgs>(this, &MainPage::PrintTaskRequested));
 
-		_print_document = Windows::UI::Xaml::Printing::PrintDocument();
-		_print_document_source = _print_document.DocumentSource();
-		_print_document.Paginate(Windows::UI::Xaml::Printing::PaginateEventHandler(this, &MainPage::Paginate));
-		_print_document.GetPreviewPage(Windows::UI::Xaml::Printing::GetPreviewPageEventHandler(this, &MainPage::GetPreviewPage));
-		_print_document.AddPages(Windows::UI::Xaml::Printing::AddPagesEventHandler(this, &MainPage::AddPages));
-	}
-	winrt::Windows::Foundation::Collections::IObservableVector<winrt::BitwardenExportPrint::PasswordElement> MainPage::password_elements() {
+	winrt::Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement> MainPage::password_elements() {
 		return _password_elements;
+	}
+	winrt::Windows::Foundation::Collections::IVector<winrt::Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement>> MainPage::password_element_pages() {
+		return _password_element_pages;
+	}
+}
+
+void winrt::BitwardenExportPrint::implementation::MainPage::RegisterForPrinting() {
+	_print_document = Windows::UI::Xaml::Printing::PrintDocument();
+	_print_document_source = _print_document.DocumentSource();
+	_print_document.Paginate(Windows::UI::Xaml::Printing::PaginateEventHandler(this, &MainPage::Paginate));
+	_print_document.GetPreviewPage(Windows::UI::Xaml::Printing::GetPreviewPageEventHandler(this, &MainPage::GetPreviewPage));
+	_print_document.AddPages(Windows::UI::Xaml::Printing::AddPagesEventHandler(this, &MainPage::AddPages));
+
+	_print_manager = Windows::Graphics::Printing::PrintManager::GetForCurrentView();
+	_print_task_requested_event_token = _print_manager.PrintTaskRequested(Windows::Foundation::TypedEventHandler<Windows::Graphics::Printing::PrintManager, Windows::Graphics::Printing::PrintTaskRequestedEventArgs>(this, &MainPage::PrintTaskRequested));
+}
+
+void winrt::BitwardenExportPrint::implementation::MainPage::UnregisterForPrinting() {
+	_password_element_pages.Clear();
+	_print_pages.clear();
+	
+	_print_document_source = nullptr;
+	_print_document = nullptr;
+
+	_print_manager.PrintTaskRequested(_print_task_requested_event_token);
+	_print_manager = nullptr;
+}
+
+void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskRequested([[maybe_unused]] Windows::Graphics::Printing::PrintManager const& sender, Windows::Graphics::Printing::PrintTaskRequestedEventArgs args) {
+	Windows::Graphics::Printing::PrintTask print_task = args.Request().CreatePrintTask(L"Print", Windows::Graphics::Printing::PrintTaskSourceRequestedHandler([=](Windows::Graphics::Printing::PrintTaskSourceRequestedArgs args) {
+		args.SetSource(_print_document_source);
+	}));
+
+	print_task.Completed(Windows::Foundation::TypedEventHandler<Windows::Graphics::Printing::PrintTask, Windows::Graphics::Printing::PrintTaskCompletedEventArgs>(this, &MainPage::PrintTaskCompleted));
+}
+
+void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskCompleted([[maybe_unused]] Windows::Graphics::Printing::PrintTask const& sender, Windows::Graphics::Printing::PrintTaskCompletedEventArgs args) {
+	if (args.Completion() == Windows::Graphics::Printing::PrintTaskCompletion::Failed) {
+		Windows::UI::Xaml::Controls::ContentDialog no_printing;
+
+		no_printing.Title(winrt::box_value(L"Printing error"));
+		no_printing.Content(winrt::box_value(L"\nSorry, printing can' t proceed at this time."));
+		no_printing.PrimaryButtonText(L"OK");
+
+		no_printing.ShowAsync();
+	}
+
+	UnregisterForPrinting();
+}
+
+void winrt::BitwardenExportPrint::implementation::MainPage::Paginate([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::PaginateEventArgs args) {
+	Windows::Graphics::Printing::PrintTaskOptions printing_options(args.PrintTaskOptions());
+	Windows::Graphics::Printing::PrintPageDescription page_description = printing_options.GetPageDescription(0);
+
+	double margin_width = (std::max)(page_description.PageSize.Width - page_description.ImageableRect.Width, page_description.PageSize.Width * _application_content_margin_left * 2);
+	double margin_height = (std::max)(page_description.PageSize.Height - page_description.ImageableRect.Height, page_description.PageSize.Height * _application_content_margin_top * 2);
+
+	double printable_area_width = page_description.PageSize.Width - margin_width; // 674.645683
+	double printable_area_height = page_description.PageSize.Height - margin_height; // 1055.168587
+
+	uint32_t i = 0;
+
+	auto page = winrt::make<winrt::BitwardenExportPrint::implementation::PasswordPrintPage>(*this, i);
+	page.Width(page_description.PageSize.Width);
+	Windows::UI::Xaml::Controls::Grid printable_area = page.FindName(L"PrintableArea").as<Windows::UI::Xaml::Controls::Grid>();
+	printable_area.Width(printable_area_width);
+
+	_password_element_pages.Append(winrt::single_threaded_observable_vector<BitwardenExportPrint::PasswordElement>());
+
+	for (auto e : _password_elements) {
+
+		_password_element_pages.GetAt(i).Append(e);
+
+		PreprintFrame().Children().Clear();
+		PreprintFrame().Children().Append(page);
+		PreprintFrame().InvalidateMeasure();
+		PreprintFrame().UpdateLayout();
+
+		double total_height = printable_area.ActualHeight();
+
+		if (total_height > printable_area_height) {
+			_password_element_pages.GetAt(i).RemoveAtEnd();
+
+			printable_area.Height(printable_area_height);
+			page.Height(page_description.PageSize.Height);
+			_print_pages.push_back(page);
+
+			if (!_password_element_pages.GetAt(i).Size()) {
+				Windows::UI::Xaml::Controls::ContentDialog no_printing;
+
+				no_printing.Title(winrt::box_value(L"Element too big to print"));
+				no_printing.Content(winrt::box_value(L"\nSorry, printing could only proceed to that point."));
+				no_printing.PrimaryButtonText(L"OK");
+
+				no_printing.ShowAsync();
+
+				_print_document.SetPreviewPageCount(i + 1, Windows::UI::Xaml::Printing::PreviewPageCountType::Final);
+
+				return;
+			}
+			
+			page = winrt::make<winrt::BitwardenExportPrint::implementation::PasswordPrintPage>(*this, ++i);
+			page.Width(page_description.PageSize.Width);
+			printable_area = page.FindName(L"PrintableArea").as<Windows::UI::Xaml::Controls::Grid>();
+			printable_area.Width(printable_area_width);
+
+			_password_element_pages.Append(winrt::single_threaded_observable_vector<BitwardenExportPrint::PasswordElement>());
+			_password_element_pages.GetAt(i).Append(e);
+		}
+	}
+
+	PreprintFrame().Children().Clear();
+	PreprintFrame().Children().Append(page);
+	PreprintFrame().InvalidateMeasure();
+	PreprintFrame().UpdateLayout();
+
+	printable_area.Height(printable_area_height);
+	page.Height(page_description.PageSize.Height);
+	_print_pages.push_back(page);
+
+	_print_document.SetPreviewPageCount(i + 1, Windows::UI::Xaml::Printing::PreviewPageCountType::Final);
+}
+
+void winrt::BitwardenExportPrint::implementation::MainPage::GetPreviewPage([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::GetPreviewPageEventArgs args) {
+	_print_document.SetPreviewPage(args.PageNumber(), _print_pages[args.PageNumber() - 1]);
+}
+
+void winrt::BitwardenExportPrint::implementation::MainPage::AddPages([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::AddPagesEventArgs args) {
+	for (auto e : _print_pages) {
+		_print_document.AddPage(e);
+	}
+
+	_print_document.AddPagesComplete();
+}
+
+winrt::fire_and_forget winrt::BitwardenExportPrint::implementation::MainPage::pick_file() {
+
+
+	Windows::Storage::StorageFile file = nullptr;
+
+	try {
+		Windows::Storage::Pickers::FileOpenPicker open_picker;
+
+		open_picker.SuggestedStartLocation(Windows::Storage::Pickers::PickerLocationId::Downloads);
+		open_picker.FileTypeFilter().Append(L".json");
+
+		auto lifetime = get_strong();
+
+		file = co_await open_picker.PickSingleFileAsync();
+	}
+	catch (...) {
+		Windows::UI::Xaml::Controls::ContentDialog no_picking;
+
+		no_picking.Title(winrt::box_value(L"File picking error"));
+		no_picking.Content(winrt::box_value(L"\nSorry, picking a file can' t proceed at this time."));
+		no_picking.PrimaryButtonText(L"OK");
+		no_picking.ShowAsync();
+
+		co_return;
+	}
+
+	if (file != nullptr);
+	else {
+		Windows::UI::Xaml::Controls::ContentDialog no_picking;
+
+		no_picking.Title(winrt::box_value(L"Operation cancelled"));
+		no_picking.Content(winrt::box_value(L"\nNo file was selected."));
+		no_picking.PrimaryButtonText(L"OK");
+		no_picking.ShowAsync();
+
+		co_return;
+	}
+
+	winrt::hstring filecontent;
+
+	try {
+		filecontent = co_await Windows::Storage::FileIO::ReadTextAsync(file);
+	}
+	catch (...) {
+		Windows::UI::Xaml::Controls::ContentDialog no_reading;
+
+		no_reading.Title(winrt::box_value(L"File reading error"));
+		no_reading.Content(winrt::box_value(L"\nSorry, reading the file can' t proceed at this time."));
+		no_reading.PrimaryButtonText(L"OK");
+		no_reading.ShowAsync();
+
+		co_return;
+	}
+
+	nlohmann::json j;
+
+	try {
+		j = nlohmann::json::parse(winrt::to_string(filecontent));
+	}
+	catch (...) {
+		Windows::UI::Xaml::Controls::ContentDialog no_parsing;
+
+		no_parsing.Title(winrt::box_value(L"File parsing error"));
+		no_parsing.Content(winrt::box_value(L"\nSorry, parsing the file can' t proceed at this time. (Wrong file format)"));
+		no_parsing.PrimaryButtonText(L"OK");
+		no_parsing.ShowAsync();
+
+		co_return;
+	}
+
+	if (!j.contains("items")) {
+		Windows::UI::Xaml::Controls::ContentDialog no_contents;
+
+		no_contents.Title(winrt::box_value(L"File has no Bitwarden contents"));
+		no_contents.Content(winrt::box_value(L"\nSorry, no contents were detected."));
+		no_contents.PrimaryButtonText(L"OK");
+		no_contents.ShowAsync();
+
+		co_return;
+	}
+
+	_password_elements.Clear();
+
+	for (auto e : j["items"]) {
+		std::string description;
+		std::string username;
+		std::string password;
+
+		try {
+			description = e["name"].get<std::string>();
+		}
+		catch (...) {}
+
+		try {
+			username = e["login"]["username"].get<std::string>();
+		}
+		catch (...) {}
+
+		try {
+			password = e["login"]["password"].get<std::string>();
+		}
+		catch (...) {}
+
+		if (description.empty() && username.empty() && password.empty()) continue;
+
+		_password_elements.Append(winrt::make<winrt::BitwardenExportPrint::implementation::PasswordElement>(winrt::to_hstring(description), winrt::to_hstring(username), winrt::to_hstring(password)));
 	}
 }
 
 void winrt::BitwardenExportPrint::implementation::MainPage::Print_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& args) {
 	if (Windows::Graphics::Printing::PrintManager::IsSupported()) {
+		RegisterForPrinting();
+
 		try {
 			_print_manager.ShowPrintUIAsync();
 		}
@@ -52,81 +287,11 @@ void winrt::BitwardenExportPrint::implementation::MainPage::Print_Click([[maybe_
 	}
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskRequested([[maybe_unused]] Windows::Graphics::Printing::PrintManager const& sender, Windows::Graphics::Printing::PrintTaskRequestedEventArgs args) {
-	Windows::Graphics::Printing::PrintTask print_task = args.Request().CreatePrintTask(L"Print", Windows::Graphics::Printing::PrintTaskSourceRequestedHandler([=](Windows::Graphics::Printing::PrintTaskSourceRequestedArgs args) {
-		args.SetSource(_print_document_source);
-	}));
-
-	print_task.Completed(Windows::Foundation::TypedEventHandler<Windows::Graphics::Printing::PrintTask, Windows::Graphics::Printing::PrintTaskCompletedEventArgs>(this, &MainPage::PrintTaskCompleted));
+void winrt::BitwardenExportPrint::implementation::MainPage::Delete_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
+	_password_elements.Clear();
 }
 
-void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskCompleted([[maybe_unused]] Windows::Graphics::Printing::PrintTask const& sender, Windows::Graphics::Printing::PrintTaskCompletedEventArgs args) {
-	if (args.Completion() == Windows::Graphics::Printing::PrintTaskCompletion::Failed) {
-		Windows::UI::Xaml::Controls::ContentDialog no_printing;
-		no_printing.Title(winrt::box_value(L"Printing error"));
-		no_printing.Content(winrt::box_value(L"\nSorry, printing can' t proceed at this time."));
-		no_printing.PrimaryButtonText(L"OK");
 
-		no_printing.ShowAsync();
-	}
-}
-
-void winrt::BitwardenExportPrint::implementation::MainPage::Paginate([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::PaginateEventArgs args) {
-	Windows::Graphics::Printing::PrintTaskOptions printing_options(args.PrintTaskOptions());
-	Windows::Graphics::Printing::PrintPageDescription page_description = printing_options.GetPageDescription(0);
-
-	_print_page.Width(page_description.PageSize.Width);
-	_print_page.Height(page_description.PageSize.Height);
-
-	Windows::UI::Xaml::Controls::Grid printable_area = _print_page.FindName(L"PrintableArea").as<Windows::UI::Xaml::Controls::Grid>();
-
-	double margin_width = (std::max)(page_description.PageSize.Width - page_description.ImageableRect.Width, page_description.PageSize.Width * _application_content_margin_left * 2);
-	double margin_height = (std::max)(page_description.PageSize.Height - page_description.ImageableRect.Height, page_description.PageSize.Height * _application_content_margin_top * 2);
-
-	printable_area.Width(_print_page.Width() - margin_width);
-	printable_area.Height(_print_page.Height() - margin_height);
-
-	_print_document.SetPreviewPageCount(1, Windows::UI::Xaml::Printing::PreviewPageCountType::Final);
-}
-
-void winrt::BitwardenExportPrint::implementation::MainPage::GetPreviewPage([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::GetPreviewPageEventArgs args) {
-	_print_document.SetPreviewPage(args.PageNumber(), _print_page);
-}
-
-void winrt::BitwardenExportPrint::implementation::MainPage::AddPages([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::AddPagesEventArgs args) {
-	_print_document.AddPage(_print_page);
-
-	_print_document.AddPagesComplete();
-}
-
-winrt::fire_and_forget winrt::BitwardenExportPrint::implementation::MainPage::pick_file() {
-	try {
-		Windows::Storage::Pickers::FileOpenPicker open_picker;
-
-		open_picker.SuggestedStartLocation(Windows::Storage::Pickers::PickerLocationId::Downloads);
-		open_picker.FileTypeFilter().Append(L".json");
-
-		auto file = co_await open_picker.PickSingleFileAsync();
-
-		auto filecontent = co_await Windows::Storage::FileIO::ReadTextAsync(file);
-
-		nlohmann::json j = nlohmann::json::parse(winrt::to_string(filecontent));
-
-
-		for (auto e : j["items"]) {
-			_password_elements.Append(winrt::make<winrt::BitwardenExportPrint::implementation::PasswordElement>(winrt::to_hstring(e["name"].get<std::string>()), winrt::to_hstring(e["login"]["username"].get<std::string>()), winrt::to_hstring(e["login"]["password"].get<std::string>())));
-		}
-	}
-	catch (...) {
-		Windows::UI::Xaml::Controls::ContentDialog no_picking;
-
-		no_picking.Title(winrt::box_value(L"File picking error"));
-		no_picking.Content(winrt::box_value(L"\nSorry, picking and parsing the file can' t proceed at this time."));
-		no_picking.PrimaryButtonText(L"OK");
-		no_picking.ShowAsync();
-	}
-}
-
-void winrt::BitwardenExportPrint::implementation::MainPage::Do_Stuff_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
+void winrt::BitwardenExportPrint::implementation::MainPage::Load_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
 	pick_file();
 }

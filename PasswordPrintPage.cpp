@@ -8,13 +8,10 @@ using namespace winrt;
 using namespace Windows::UI::Xaml;
 
 namespace winrt::BitwardenExportPrint::implementation {
-	/*PasswordPrintPage::PasswordPrintPage() {
-		InitializeComponent();
-	}*/
-	PasswordPrintPage::PasswordPrintPage(winrt::BitwardenExportPrint::MainPage const& main_page) : _main_page(main_page) {
+	PasswordPrintPage::PasswordPrintPage(winrt::BitwardenExportPrint::MainPage const& main_page, uint32_t const& page_number) : _main_page(main_page), _page_number(page_number) {
 		InitializeComponent();
 	}
 	winrt::Windows::Foundation::Collections::IObservableVector<winrt::BitwardenExportPrint::PasswordElement> PasswordPrintPage::password_elements() {
-		return _main_page.password_elements();
+		return _main_page.password_element_pages().GetAt(_page_number);
 	}
 }

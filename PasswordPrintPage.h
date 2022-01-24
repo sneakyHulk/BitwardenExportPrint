@@ -4,16 +4,19 @@
 
 #include "PasswordElement.h"
 
+#include <winrt/Microsoft.UI.Xaml.Controls.h>
+
 namespace winrt::BitwardenExportPrint::implementation {
 	struct PasswordPrintPage : PasswordPrintPageT<PasswordPrintPage> {
 		PasswordPrintPage() = default;
 
-		PasswordPrintPage(winrt::BitwardenExportPrint::MainPage const&);
+		PasswordPrintPage(winrt::BitwardenExportPrint::MainPage const&, uint32_t const&);
 
 		winrt::Windows::Foundation::Collections::IObservableVector<winrt::BitwardenExportPrint::PasswordElement> PasswordPrintPage::password_elements();
 
 	private:
 		BitwardenExportPrint::MainPage _main_page;
+		uint32_t _page_number;
 	};
 }
 
