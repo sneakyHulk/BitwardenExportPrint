@@ -18,9 +18,6 @@ namespace winrt::BitwardenExportPrint::implementation {
 	winrt::Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement> MainPage::password_elements() {
 		return _password_elements;
 	}
-	winrt::Windows::Foundation::Collections::IVector<winrt::Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement>> MainPage::password_element_pages() {
-		return _password_element_pages;
-	}
 }
 
 void winrt::BitwardenExportPrint::implementation::MainPage::RegisterForPrinting() {
@@ -35,9 +32,6 @@ void winrt::BitwardenExportPrint::implementation::MainPage::RegisterForPrinting(
 }
 
 void winrt::BitwardenExportPrint::implementation::MainPage::UnregisterForPrinting() {
-	_password_element_pages.Clear();
-	_print_pages.clear();
-	
 	_print_document_source = nullptr;
 	_print_document = nullptr;
 
@@ -49,7 +43,7 @@ void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskRequested([
 	Windows::Graphics::Printing::PrintTask print_task = args.Request().CreatePrintTask(L"Print", Windows::Graphics::Printing::PrintTaskSourceRequestedHandler([=](Windows::Graphics::Printing::PrintTaskSourceRequestedArgs args) {
 		args.SetSource(_print_document_source);
 	}));
-
+	
 	print_task.Completed(Windows::Foundation::TypedEventHandler<Windows::Graphics::Printing::PrintTask, Windows::Graphics::Printing::PrintTaskCompletedEventArgs>(this, &MainPage::PrintTaskCompleted));
 }
 
@@ -68,14 +62,16 @@ void winrt::BitwardenExportPrint::implementation::MainPage::PrintTaskCompleted([
 }
 
 void winrt::BitwardenExportPrint::implementation::MainPage::Paginate([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::PaginateEventArgs args) {
+	PreprintFrame().Children().Clear();
+	
 	Windows::Graphics::Printing::PrintTaskOptions printing_options(args.PrintTaskOptions());
 	Windows::Graphics::Printing::PrintPageDescription page_description = printing_options.GetPageDescription(0);
 
 	double margin_width = (std::max)(page_description.PageSize.Width - page_description.ImageableRect.Width, page_description.PageSize.Width * _application_content_margin_left * 2);
 	double margin_height = (std::max)(page_description.PageSize.Height - page_description.ImageableRect.Height, page_description.PageSize.Height * _application_content_margin_top * 2);
 
-	double printable_area_width = page_description.PageSize.Width - margin_width; // 674.645683
-	double printable_area_height = page_description.PageSize.Height - margin_height; // 1055.168587
+	double printable_area_width = page_description.PageSize.Width - margin_width;
+	double printable_area_height = page_description.PageSize.Height - margin_height;
 
 	uint32_t i = 0;
 
@@ -84,27 +80,30 @@ void winrt::BitwardenExportPrint::implementation::MainPage::Paginate([[maybe_unu
 	Windows::UI::Xaml::Controls::Grid printable_area = page.FindName(L"PrintableArea").as<Windows::UI::Xaml::Controls::Grid>();
 	printable_area.Width(printable_area_width);
 
-	_password_element_pages.Append(winrt::single_threaded_observable_vector<BitwardenExportPrint::PasswordElement>());
-
+	PreprintFrame().Children().Append(page);
+	
 	for (auto e : _password_elements) {
+		page.password_elements().Append(e);
 
-		_password_element_pages.GetAt(i).Append(e);
-
-		PreprintFrame().Children().Clear();
-		PreprintFrame().Children().Append(page);
 		PreprintFrame().InvalidateMeasure();
 		PreprintFrame().UpdateLayout();
 
 		double total_height = printable_area.ActualHeight();
 
 		if (total_height > printable_area_height) {
-			_password_element_pages.GetAt(i).RemoveAtEnd();
+			page.password_elements().RemoveAtEnd();
+
+			page.Height(page_description.PageSize.Height);
+
+			PreprintFrame().InvalidateMeasure();
+			PreprintFrame().UpdateLayout();
 
 			printable_area.Height(printable_area_height);
-			page.Height(page_description.PageSize.Height);
-			_print_pages.push_back(page);
 
-			if (!_password_element_pages.GetAt(i).Size()) {
+			PreprintFrame().InvalidateMeasure();
+			PreprintFrame().UpdateLayout();
+
+			if (!page.password_elements().Size()) {
 				Windows::UI::Xaml::Controls::ContentDialog no_printing;
 
 				no_printing.Title(winrt::box_value(L"Element too big to print"));
@@ -123,29 +122,39 @@ void winrt::BitwardenExportPrint::implementation::MainPage::Paginate([[maybe_unu
 			printable_area = page.FindName(L"PrintableArea").as<Windows::UI::Xaml::Controls::Grid>();
 			printable_area.Width(printable_area_width);
 
-			_password_element_pages.Append(winrt::single_threaded_observable_vector<BitwardenExportPrint::PasswordElement>());
-			_password_element_pages.GetAt(i).Append(e);
+			PreprintFrame().Children().Append(page);
+
+			page.password_elements().Append(e);
 		}
 	}
+	
+	page.Height(page_description.PageSize.Height);
 
-	PreprintFrame().Children().Clear();
-	PreprintFrame().Children().Append(page);
 	PreprintFrame().InvalidateMeasure();
 	PreprintFrame().UpdateLayout();
 
 	printable_area.Height(printable_area_height);
-	page.Height(page_description.PageSize.Height);
-	_print_pages.push_back(page);
+
+	PreprintFrame().InvalidateMeasure();
+	PreprintFrame().UpdateLayout();
+
+	// Looks stupid, but is necessary. Printing under Windows is a bit buggy.
+	for (auto e : PreprintFrame().Children()) {
+		e.as<BitwardenExportPrint::PasswordPrintPage>().UpdateData(PreprintFrame().Children().Size());
+	}
+
+	PreprintFrame().InvalidateMeasure();
+	PreprintFrame().UpdateLayout();
 
 	_print_document.SetPreviewPageCount(i + 1, Windows::UI::Xaml::Printing::PreviewPageCountType::Final);
 }
 
 void winrt::BitwardenExportPrint::implementation::MainPage::GetPreviewPage([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::GetPreviewPageEventArgs args) {
-	_print_document.SetPreviewPage(args.PageNumber(), _print_pages[args.PageNumber() - 1]);
+	_print_document.SetPreviewPage(args.PageNumber(), PreprintFrame().Children().GetAt(args.PageNumber() - 1));
 }
 
 void winrt::BitwardenExportPrint::implementation::MainPage::AddPages([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, Windows::UI::Xaml::Printing::AddPagesEventArgs args) {
-	for (auto e : _print_pages) {
+	for (auto e : PreprintFrame().Children()) {
 		_print_document.AddPage(e);
 	}
 
@@ -153,8 +162,6 @@ void winrt::BitwardenExportPrint::implementation::MainPage::AddPages([[maybe_unu
 }
 
 winrt::fire_and_forget winrt::BitwardenExportPrint::implementation::MainPage::pick_file() {
-
-
 	Windows::Storage::StorageFile file = nullptr;
 
 	try {
@@ -290,7 +297,6 @@ void winrt::BitwardenExportPrint::implementation::MainPage::Print_Click([[maybe_
 void winrt::BitwardenExportPrint::implementation::MainPage::Delete_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
 	_password_elements.Clear();
 }
-
 
 void winrt::BitwardenExportPrint::implementation::MainPage::Load_Click([[maybe_unused]] winrt::Windows::Foundation::IInspectable const& sender, [[maybe_unused]] winrt::Windows::UI::Xaml::RoutedEventArgs const& e) {
 	pick_file();

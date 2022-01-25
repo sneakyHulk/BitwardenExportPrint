@@ -15,22 +15,18 @@ namespace winrt::BitwardenExportPrint::implementation {
 		MainPage();
 
 		winrt::Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement> password_elements();
-		winrt::Windows::Foundation::Collections::IVector<winrt::Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement>> password_element_pages();
 
 	private:
 		Windows::Graphics::Printing::PrintManager _print_manager = nullptr;
+		winrt::event_token _print_task_requested_event_token;
+
 		Windows::Graphics::Printing::IPrintDocumentSource _print_document_source = nullptr;
 		Windows::UI::Xaml::Printing::PrintDocument _print_document = nullptr;
 
 		float _application_content_margin_left = 0.075f;
 		float _application_content_margin_top = 0.03f;
 
-		std::vector<Windows::UI::Xaml::Controls::Page> _print_pages;
-
 		Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement> _password_elements = winrt::single_threaded_observable_vector<BitwardenExportPrint::PasswordElement>();
-		Windows::Foundation::Collections::IObservableVector<Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement>> _password_element_pages = winrt::single_threaded_observable_vector<Windows::Foundation::Collections::IObservableVector<BitwardenExportPrint::PasswordElement>>();
-	
-		winrt::event_token _print_task_requested_event_token;
 
 		void RegisterForPrinting();
 		void UnregisterForPrinting();

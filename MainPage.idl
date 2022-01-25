@@ -8,6 +8,5 @@ namespace BitwardenExportPrint
         MainPage();
 
         Windows.Foundation.Collections.IObservableVector<PasswordElement> password_elements{ get; };
-        Windows.Foundation.Collections.IVector<Windows.Foundation.Collections.IObservableVector<PasswordElement> > password_element_pages{ get; };
     }
 }

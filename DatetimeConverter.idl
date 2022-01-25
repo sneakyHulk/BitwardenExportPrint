@@ -1,0 +1,8 @@
+namespace BitwardenExportPrint
+{
+    [default_interface]
+    runtimeclass DatetimeConverter : Windows.UI.Xaml.Data.IValueConverter
+    {
+        DatetimeConverter();
+    }
+}

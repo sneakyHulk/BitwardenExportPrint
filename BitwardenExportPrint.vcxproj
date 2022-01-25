@@ -109,6 +109,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="DatetimeConverter.h" />
     <ClInclude Include="PasswordElement.h" />
     <ClInclude Include="PasswordPrintPage.h">
       <DependentUpon>PasswordPrintPage.xaml</DependentUpon>
@@ -148,6 +149,7 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DatetimeConverter.cpp" />
     <ClCompile Include="PasswordElement.cpp" />
     <ClCompile Include="PasswordPrintPage.cpp">
       <DependentUpon>PasswordPrintPage.xaml</DependentUpon>
@@ -168,6 +170,7 @@
     <Midl Include="App.idl">
       <DependentUpon>App.xaml</DependentUpon>
     </Midl>
+    <Midl Include="DatetimeConverter.idl" />
     <Midl Include="MainPage.idl">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Midl>

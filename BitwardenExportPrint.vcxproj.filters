@@ -11,6 +11,9 @@
     <Midl Include="App.idl" />
     <Midl Include="MainPage.idl" />
     <Midl Include="PasswordElement.idl" />
+    <Midl Include="DatetimeConverter.idl">
+      <Filter>Converter</Filter>
+    </Midl>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
@@ -18,10 +21,16 @@
     <ClCompile Include="MainPage.cpp" />
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
     <ClCompile Include="PasswordElement.cpp" />
+    <ClCompile Include="DatetimeConverter.cpp">
+      <Filter>Converter</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="PasswordElement.h" />
+    <ClInclude Include="DatetimeConverter.h">
+      <Filter>Converter</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Wide310x150Logo.scale-200.png">
@@ -52,6 +61,9 @@
   <ItemGroup>
     <Filter Include="Assets">
       <UniqueIdentifier>{e48dc53e-40b1-40cb-970a-f89935452892}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Converter">
+      <UniqueIdentifier>{594f34f5-5462-4f43-8e03-f82fc05d341a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
