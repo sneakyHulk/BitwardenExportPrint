@@ -5,7 +5,7 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <winrt/Windows.Storage.Pickers.h>
-#include <windows.ui.xaml.interop.h>
+#include <winrt/Windows.UI.Xaml.Interop.h>
 
 using namespace winrt;
 using namespace Windows::UI::Xaml;
